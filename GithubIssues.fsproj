@@ -9,4 +9,8 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FsHttp" Version="10.0.0" />
+  </ItemGroup>
+
 </Project>
