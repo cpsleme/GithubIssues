@@ -10,69 +10,26 @@ open System.Timers
 module Domain =
 
     // Response from Github
-    type User =
-        { login: string
-          id: int
-          node_id: string
-          avatar_url: string
-          gravatar_id: string
-          url: string
-          html_url: string
-          followers_url: string
-          following_url: string
-          gists_url: string
-          starred_url: string
-          subscriptions_url: string
-          organizations_url: string
-          repos_url: string
-          events_url: string
-          received_events_url: string
-          user_type: string
-          site_admin: bool }
+    type User = { id: int64; login: string }
 
-    type Reactions =
-        { url: string
-          total_count: int
-          //"+1": int
-          //"-1": int
-          laugh: int
-          hooray: int
-          confused: int
-          heart: int
-          rocket: int
-          eyes: int }
+    type Label = { id: int64; name: string }
 
     type Issue =
-        { url: string
-          repository_url: string
-          labels_url: string
-          comments_url: string
-          events_url: string
-          html_url: string
-          id: int
-          node_id: string
-          number: int
-          title: string
+        { title: string
           user: User
-          labels: string list
-          state: string
-          locked: bool
-          assignee: User option
-          assignees: User list
-          milestone: unit option
-          comments: int
-          created_at: string
-          updated_at: string
-          closed_at: string option
-          author_association: string
-          active_lock_reason: string option
-          body: string
-          reactions: Reactions
-          timeline_url: string
-          performed_via_github_app: unit option
-          state_reason: unit option }
+          labels: Label list }
 
     type IssueList = Issue list
+
+    type Author = { login: string }
+
+    type AuthorInfo = { name: string }
+
+    type CommitInfo = { author: AuthorInfo }
+
+    type Commit = { commit: CommitInfo; author: Author }
+
+    type CommitList = Commit list
 
     // Response to webhook
     type IssueResponse =
@@ -91,9 +48,13 @@ module Domain =
           Issues: IssueResponse list
           Contributors: Contributor list }
 
+
 // IO implementation
+
+open Domain
+
 module Infra =
-    let Get (uri: string, token: string) =
+    let get (uri: string, token: string) =
         http {
             GET uri
             Accept "application/vnd.github+json"
@@ -112,23 +73,70 @@ module App =
         let stopWatch = Stopwatch.StartNew()
 
         let requestIssues =
-            task { return JsonSerializer.Deserialize<IssueList>(Infra.Get(issuesURI, token)) }
+            task { return JsonSerializer.Deserialize<IssueList>(Infra.get (issuesURI, token)) }
 
         stopWatch.Stop()
 
-        requestIssues.Result.Length, stopWatch.Elapsed.Milliseconds
+        requestIssues.Result, stopWatch.Elapsed.Milliseconds
 
-    let run (urlBase: string, token: string) =
+    let getCommits urlBase token =
+        let commitsURI = $"{urlBase}/commits"
+        let stopWatch = Stopwatch.StartNew()
+
+        let requestCommits =
+            task { return JsonSerializer.Deserialize<CommitList>(Infra.get (commitsURI, token)) }
+
+        stopWatch.Stop()
+
+        requestCommits.Result, stopWatch.Elapsed.Milliseconds
+
+    let run (username: string, repo: string, urlBase: string, token: string) =
         try
             // Get issues from repo using Github REST API
-            let issuesQuantity, timeElapsed = getIssues urlBase token
-            printfn $"{DateTime.Now.ToString()} - Issues: {issuesQuantity} Time elapsed: {timeElapsed:N0} milliseconds."
+            let issuesResult, timeElapsed = getIssues urlBase token
+
+            printfn
+                $"{DateTime.Now.ToString()} - Issues: {issuesResult.Length} Time elapsed: {timeElapsed:N0} milliseconds."
+
+            let issues =
+                issuesResult
+                |> List.map (fun x ->
+                    { Title = x.title
+                      Author = x.user.login
+                      Labels = x.labels |> List.choose (fun l -> Some l.name) })
+
+            // Get commits from repo using Github REST API
+            let commits, timeElapsed = getCommits urlBase token
+
+            printfn
+                $"{DateTime.Now.ToString()} - Commits: {commits.Length} Time elapsed: {timeElapsed:N0} milliseconds."
+
+            let commitsByUser =
+                commits
+                |> List.countBy (fun x -> x.commit.author.name, x.author.login)
+                |> List.map (fun ((name, user), qty) ->
+                    { Name = name
+                      User = user
+                      QtdCommits = qty })
+
+            // Generate list of results
+            let result =
+                { User = username
+                  Repository = repo
+                  Issues = issues
+                  Contributors = commitsByUser }
+                
+            // Serialize results
+            let resultJson = JsonSerializer.Serialize result
+            
+            printfn $"{resultJson}"
+            ()
 
         with ex ->
             printfn $"Error: {ex.Message}"
 
         ()
-        
+
 // Startup app with scheduler
 module Startup =
     let run (username: string, repo: string, token: string) =
@@ -138,11 +146,12 @@ module Startup =
 
         // Start a timer
         let aTimer = new Timer(60000.0)
-        aTimer.Elapsed.Add(fun _ -> App.run (urlBase, token))
+        aTimer.Elapsed.Add(fun _ -> App.run (username, repo, urlBase, token))
         aTimer.Enabled <- true
 
         // Everything ok to start
-        printfn $"Getting issues from {repo}"
+        printfn $"{DateTime.Now.ToString()} - Getting issues from {repo}"
+        App.run (username, repo, urlBase, token)
 
         // Infinite loop to keep alive
         while true do
@@ -185,9 +194,8 @@ let main argv =
     | null ->
         printfn "Please, set GITHUB_API_TOKEN environment variable."
         exit 1
-    | _ -> printfn "App ready to run."
+    | _ -> printfn $"{DateTime.Now.ToString()} - App ready to run."
 
     Startup.run (username, repo, token)
 
     0
-
