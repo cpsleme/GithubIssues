@@ -48,11 +48,7 @@ module Domain =
           Issues: IssueResponse list
           Contributors: Contributor list }
 
-
 // IO implementation
-
-open Domain
-
 module Infra =
     let get (uri: string, token: string) =
         http {
@@ -68,72 +64,75 @@ module Infra =
 module App =
     open Domain
 
+    // Generic function to get some data
+    let getData info urlBase token =
+        let issuesURI = $"{urlBase}/{info}"
+        let stopWatch = Stopwatch.StartNew()
+
+        let response = task { return (Infra.get (issuesURI, token)) }
+
+        stopWatch.Stop()
+
+        response.Result, stopWatch.Elapsed.Milliseconds
+
+    // Get issues from repo using Github REST API
     let getIssues urlBase token =
-        let issuesURI = $"{urlBase}/issues"
-        let stopWatch = Stopwatch.StartNew()
+        
+        let issuesJson, timeElapsed = getData "issues" urlBase token
+        let issuesResult = JsonSerializer.Deserialize<IssueList> issuesJson
 
-        let requestIssues =
-            task { return JsonSerializer.Deserialize<IssueList>(Infra.get (issuesURI, token)) }
+        printfn
+            $"{DateTime.Now.ToString()} - Issues: {issuesResult.Length} Time elapsed: {timeElapsed:N0} milliseconds."
 
-        stopWatch.Stop()
+        let issues: IssueResponse list =
+            issuesResult
+            |> List.map (fun x ->
+                { Title = x.title
+                  Author = x.user.login
+                  Labels = x.labels |> List.choose (fun l -> Some l.name) })
 
-        requestIssues.Result, stopWatch.Elapsed.Milliseconds
+        issues
 
+    // Get commits from repo using Github REST API
     let getCommits urlBase token =
-        let commitsURI = $"{urlBase}/commits"
-        let stopWatch = Stopwatch.StartNew()
+        
+        let commitsJson, timeElapsed = getData "commits" urlBase token
+        let commitsResult = JsonSerializer.Deserialize<CommitList> commitsJson
 
-        let requestCommits =
-            task { return JsonSerializer.Deserialize<CommitList>(Infra.get (commitsURI, token)) }
+        printfn
+            $"{DateTime.Now.ToString()} - Commits: {commitsResult.Length} Time elapsed: {timeElapsed:N0} milliseconds."
 
-        stopWatch.Stop()
+        let commitsByUser =
+            commitsResult
+            |> List.countBy (fun x -> x.commit.author.name, x.author.login)
+            |> List.map (fun ((name, user), qty) ->
+                { Name = name
+                  User = user
+                  QtdCommits = qty })
 
-        requestCommits.Result, stopWatch.Elapsed.Milliseconds
+        commitsByUser
 
     let run (username: string, repo: string, urlBase: string, token: string) =
         try
-            // Get issues from repo using Github REST API
-            let issuesResult, timeElapsed = getIssues urlBase token
-
-            printfn
-                $"{DateTime.Now.ToString()} - Issues: {issuesResult.Length} Time elapsed: {timeElapsed:N0} milliseconds."
-
-            let issues =
-                issuesResult
-                |> List.map (fun x ->
-                    { Title = x.title
-                      Author = x.user.login
-                      Labels = x.labels |> List.choose (fun l -> Some l.name) })
-
-            // Get commits from repo using Github REST API
-            let commits, timeElapsed = getCommits urlBase token
-
-            printfn
-                $"{DateTime.Now.ToString()} - Commits: {commits.Length} Time elapsed: {timeElapsed:N0} milliseconds."
-
-            let commitsByUser =
-                commits
-                |> List.countBy (fun x -> x.commit.author.name, x.author.login)
-                |> List.map (fun ((name, user), qty) ->
-                    { Name = name
-                      User = user
-                      QtdCommits = qty })
-
+            // Get issues
+            let issues = getIssues urlBase token
+            // Get commits
+            let commitsByUser = getCommits urlBase token
             // Generate list of results
             let result =
                 { User = username
                   Repository = repo
                   Issues = issues
                   Contributors = commitsByUser }
-                
+
             // Serialize results
             let resultJson = JsonSerializer.Serialize result
-            
+
             printfn $"{resultJson}"
             ()
 
         with ex ->
-            printfn $"Error: {ex.Message}"
+            printfn $"{DateTime.Now.ToString()} - Error: {ex.Message}"
 
         ()
 
@@ -151,6 +150,8 @@ module Startup =
 
         // Everything ok to start
         printfn $"{DateTime.Now.ToString()} - Getting issues from {repo}"
+        
+        // Exec first time
         App.run (username, repo, urlBase, token)
 
         // Infinite loop to keep alive
