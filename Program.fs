@@ -133,6 +133,7 @@ module App =
 
     let run (config : IDictionary<string, string>) =
         try
+            // Config variables
             let username = config["GITHUB_USERNAME"]
             let repo = config["GITHUB_REPO"]
             let token = config["GITHUB_API_TOKEN"]
@@ -159,12 +160,10 @@ module App =
 
             // Send to webhook
             sendToWebhook resultJson webhook
-
             ()
 
         with ex ->
             printfn $"{DateTime.Now.ToString()} - Error: {ex.Message}"
-
         ()
 
 // Startup app with scheduler
@@ -173,6 +172,7 @@ module Startup =
 
         printfn $"{DateTime.Now.ToString()} - App ready to run."
 
+        // Config variables
         let repo = config["GITHUB_REPO"]
         let interval =
             match Int32.TryParse(config["CHECKING_INTERVAL"]) with
@@ -224,5 +224,6 @@ let main argv =
     | _ ->
         envVarEmpty
         |> List.iter (fun (var, _) -> printfn $"Please, set {var} environment variable.")
+        exit 1
 
     0
