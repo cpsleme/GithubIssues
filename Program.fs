@@ -1,4 +1,6 @@
 ﻿open System
+open System.Collections.Generic
+open System.Net
 open System.Reflection
 open System.Threading
 open FsHttp
@@ -121,12 +123,29 @@ module App =
 
         commitsByUser
 
-    let run username repo urlBase token webhook =
+    // Send to webhook
+    let sendToWebhook resultJson webhook =
+        let response = task { return Infra.post webhook resultJson }
+
+        match response.Result.statusCode with
+        | HttpStatusCode.OK -> printfn $"{DateTime.Now.ToString()} - Result sent to webhook."
+        | _ -> printfn $"{DateTime.Now.ToString()} - Error: {response.Result.reasonPhrase}"
+
+    let run (config : IDictionary<string, string>) =
         try
+            let username = config["GITHUB_USERNAME"]
+            let repo = config["GITHUB_REPO"]
+            let token = config["GITHUB_API_TOKEN"]
+            let webhook = config["WEBHOOK_URL"]
+
+            // Set URL Base
+            let urlBase = $"https://api.github.com/repos/{username}/{repo}"
+            
             // Get issues
             let issues = getIssues urlBase token
             // Get commits
             let commitsByUser = getCommits urlBase token
+            
             // Generate list of results
             let result =
                 { User = username
@@ -139,12 +158,7 @@ module App =
             printfn $"{DateTime.Now.ToString()} - Result: {resultJson}"
 
             // Send to webhook
-            let response =
-                task { return Infra.post webhook resultJson }
-
-            match response.Result.statusCode with
-            | OK -> printfn $"{DateTime.Now.ToString()} - Result sent to webhook."
-            | _ -> printfn $"{DateTime.Now.ToString()} - Error: {response.Result.reasonPhrase}"
+            sendToWebhook resultJson webhook
 
             ()
 
@@ -155,22 +169,27 @@ module App =
 
 // Startup app with scheduler
 module Startup =
-    let run username repo token checkingInterval webhook =
+    let run (config : IDictionary<string, string>) =
 
-        // Set URL Base
-        let urlBase = $"https://api.github.com/repos/{username}/{repo}"
+        printfn $"{DateTime.Now.ToString()} - App ready to run."
+
+        let repo = config["GITHUB_REPO"]
+        let interval =
+            match Int32.TryParse(config["CHECKING_INTERVAL"]) with
+                | true, int -> int
+                | _ -> 1
 
         // Start a timer
-        let interval = checkingInterval * 1000 * 60 * 60
+        let interval = interval * 1000 * 60 * 60
         let aTimer = new Timer(interval)
-        aTimer.Elapsed.Add(fun _ -> App.run username repo urlBase token webhook)
+        aTimer.Elapsed.Add(fun _ -> App.run config)
         aTimer.Enabled <- true
 
         // Everything ok to start
-        printfn $"{DateTime.Now.ToString()} - Getting issues from {repo}"
+        printfn $"{DateTime.Now.ToString()} - Getting issues and commits from {repo} repository."
 
         // Exec first time
-        App.run username repo urlBase token webhook
+        App.run config
 
         // Infinite loop to keep alive
         while true do
@@ -184,44 +203,26 @@ let main argv =
     printfn $"Github Issues - Version: {build}"
     printfn ""
 
-    // Get environment variables
-    let username = Environment.GetEnvironmentVariable("GITHUB_USERNAME")
-    match username with
-    | null ->
-        printfn "Please, set GITHUB_USERNAME environment variable."
-        exit 1
-    | _ -> ()
+    let envVariables =
+        [ "GITHUB_USERNAME"
+          "GITHUB_REPO"
+          "GITHUB_API_TOKEN"
+          "WEBHOOK_URL"
+          "CHECKING_INTERVAL" ]
 
-    let repo = Environment.GetEnvironmentVariable("GITHUB_REPO")
-    match repo with
-    | null ->
-        printfn "Please, set GITHUB_REPO environment variable."
-        exit 1
-    | _ -> ()
+    let envVarValues =
+        envVariables |> List.map (fun x -> x, Environment.GetEnvironmentVariable x)
 
-    let token = Environment.GetEnvironmentVariable("GITHUB_API_TOKEN")
-    match token with
-    | null ->
-        printfn "Please, set GITHUB_API_TOKEN environment variable."
-        exit 1
-    | _ -> ()
+    let envVarEmpty =
+        envVarValues |> List.filter (fun (_, value) -> value.Equals(String.Empty))
 
-    let webhook = Environment.GetEnvironmentVariable("WEBHOOK_URL")
-    match webhook with
-    | null ->
-        printfn "Please, set WEBHOOK_URL environment variable."
-        exit 1
-    | _ -> ()
-
-    let checkingInterval =
-        Int32.TryParse(Environment.GetEnvironmentVariable("CHECKING_INTERVAL"))
-
-    let interval =
-        match checkingInterval with
-        | true, int -> int
-        | _ -> 24
-
-    printfn $"{DateTime.Now.ToString()} - App ready to run."
-    Startup.run username repo token  interval webhook
+    match envVarEmpty.Length with
+    | 0 ->
+        let config = envVarValues |> dict
+        Startup.run config
+        ()
+    | _ ->
+        envVarEmpty
+        |> List.iter (fun (var, _) -> printfn $"Please, set {var} environment variable.")
 
     0
