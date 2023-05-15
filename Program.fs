@@ -50,7 +50,7 @@ module Domain =
 
 // IO implementation
 module Infra =
-    let get (uri: string, token: string) =
+    let get uri token =
         http {
             GET uri
             Accept "application/vnd.github+json"
@@ -59,6 +59,15 @@ module Infra =
         }
         |> Request.send
         |> Response.toJson
+
+    let post uri sendData =
+        http {
+            POST uri
+            CacheControl "no-cache"
+            body
+            json sendData
+        }
+        |> Request.send
 
 // think about IO but not its implementation
 module App =
@@ -69,7 +78,7 @@ module App =
         let issuesURI = $"{urlBase}/{info}"
         let stopWatch = Stopwatch.StartNew()
 
-        let response = task { return (Infra.get (issuesURI, token)) }
+        let response = task { return (Infra.get issuesURI token) }
 
         stopWatch.Stop()
 
@@ -77,7 +86,7 @@ module App =
 
     // Get issues from repo using Github REST API
     let getIssues urlBase token =
-        
+
         let issuesJson, timeElapsed = getData "issues" urlBase token
         let issuesResult = JsonSerializer.Deserialize<IssueList> issuesJson
 
@@ -95,7 +104,7 @@ module App =
 
     // Get commits from repo using Github REST API
     let getCommits urlBase token =
-        
+
         let commitsJson, timeElapsed = getData "commits" urlBase token
         let commitsResult = JsonSerializer.Deserialize<CommitList> commitsJson
 
@@ -112,7 +121,7 @@ module App =
 
         commitsByUser
 
-    let run (username: string, repo: string, urlBase: string, token: string) =
+    let run username repo urlBase token webhook =
         try
             // Get issues
             let issues = getIssues urlBase token
@@ -127,8 +136,16 @@ module App =
 
             // Serialize results
             let resultJson = JsonSerializer.Serialize result
+            printfn $"{DateTime.Now.ToString()} - Result: {resultJson}"
 
-            printfn $"{resultJson}"
+            // Send to webhook
+            let response =
+                task { return Infra.post webhook resultJson }
+
+            match response.Result.statusCode with
+            | OK -> printfn $"{DateTime.Now.ToString()} - Result sent to webhook."
+            | _ -> printfn $"{DateTime.Now.ToString()} - Error: {response.Result.reasonPhrase}"
+
             ()
 
         with ex ->
@@ -138,21 +155,22 @@ module App =
 
 // Startup app with scheduler
 module Startup =
-    let run (username: string, repo: string, token: string) =
+    let run username repo token checkingInterval webhook =
 
         // Set URL Base
         let urlBase = $"https://api.github.com/repos/{username}/{repo}"
 
         // Start a timer
-        let aTimer = new Timer(60000.0)
-        aTimer.Elapsed.Add(fun _ -> App.run (username, repo, urlBase, token))
+        let interval = checkingInterval * 1000 * 60 * 60
+        let aTimer = new Timer(interval)
+        aTimer.Elapsed.Add(fun _ -> App.run username repo urlBase token webhook)
         aTimer.Enabled <- true
 
         // Everything ok to start
         printfn $"{DateTime.Now.ToString()} - Getting issues from {repo}"
-        
+
         // Exec first time
-        App.run (username, repo, urlBase, token)
+        App.run username repo urlBase token webhook
 
         // Infinite loop to keep alive
         while true do
@@ -166,37 +184,44 @@ let main argv =
     printfn $"Github Issues - Version: {build}"
     printfn ""
 
-    // Get user inputs or environment variables
-    let username, repo, config =
-        match argv.Length with
-        | 2 -> argv[0], argv[1], "input"
-        | _ ->
-            Environment.GetEnvironmentVariable("GITHUB_USERNAME"),
-            Environment.GetEnvironmentVariable("GITHUB_REPO"),
-            "env"
+    // Get environment variables
+    let username = Environment.GetEnvironmentVariable("GITHUB_USERNAME")
+    match username with
+    | null ->
+        printfn "Please, set GITHUB_USERNAME environment variable."
+        exit 1
+    | _ -> ()
 
-    if config.Equals("env") then
-        match username with
-        | null ->
-            printfn "Please, set GITHUB_USERNAME environment variable."
-            exit 1
-        | _ -> ()
+    let repo = Environment.GetEnvironmentVariable("GITHUB_REPO")
+    match repo with
+    | null ->
+        printfn "Please, set GITHUB_REPO environment variable."
+        exit 1
+    | _ -> ()
 
-        match repo with
-        | null ->
-            printfn "Please, set GITHUB_REPO environment variable."
-            exit 1
-        | _ -> ()
-
-    // Get Github token
     let token = Environment.GetEnvironmentVariable("GITHUB_API_TOKEN")
-
     match token with
     | null ->
         printfn "Please, set GITHUB_API_TOKEN environment variable."
         exit 1
-    | _ -> printfn $"{DateTime.Now.ToString()} - App ready to run."
+    | _ -> ()
 
-    Startup.run (username, repo, token)
+    let webhook = Environment.GetEnvironmentVariable("WEBHOOK_URL")
+    match webhook with
+    | null ->
+        printfn "Please, set WEBHOOK_URL environment variable."
+        exit 1
+    | _ -> ()
+
+    let checkingInterval =
+        Int32.TryParse(Environment.GetEnvironmentVariable("CHECKING_INTERVAL"))
+
+    let interval =
+        match checkingInterval with
+        | true, int -> int
+        | _ -> 24
+
+    printfn $"{DateTime.Now.ToString()} - App ready to run."
+    Startup.run username repo token  interval webhook
 
     0
