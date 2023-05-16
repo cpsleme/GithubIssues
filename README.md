@@ -7,6 +7,11 @@ Essa consulta é realizada de tempos em tempos com um intervalo em horas informa
 
 O projeto foi desenvolvido na linguagem F# (F Sharp) da plataforma Microsoft .NET, e segue nesse caso o paradigma funcional, já que a linguagem é multi-paradigma.
 
+# Arquitetura
+
+O projeto segue uma organização em camadas seguindo um padrão de arquitetura chamado Onion Architecture.
+Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-building-maintainable-software-54996ff8e464
+
 # Requisitos de instalação
 
 - SDK do .NET, versão 6 ou maior
