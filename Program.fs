@@ -174,13 +174,13 @@ module Startup =
 
         // Config variables
         let repo = config["GITHUB_REPO"]
-        let interval =
+        let intervalEnv =
             match Int32.TryParse(config["CHECKING_INTERVAL"]) with
                 | true, int -> int
                 | _ -> 1
 
         // Start a timer
-        let interval = interval * 1000 * 60 * 60
+        let interval = intervalEnv * 1000 * 60 * 60
         let aTimer = new Timer(interval)
         aTimer.Elapsed.Add(fun _ -> App.run config)
         aTimer.Enabled <- true
