@@ -1,6 +1,5 @@
 namespace GitHubIssues
 
-open Infra
 open System.Collections.Generic
 open System.Net
 open System.Diagnostics
