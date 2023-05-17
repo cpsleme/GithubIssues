@@ -10,6 +10,7 @@ O projeto foi desenvolvido na linguagem F# (F Sharp) da plataforma Microsoft .NE
 # Arquitetura
 
 O projeto segue uma organização em camadas seguindo um padrão de arquitetura chamado Onion Architecture.
+
 Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-building-maintainable-software-54996ff8e464
 
 # Requisitos de instalação
@@ -24,9 +25,13 @@ Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-bui
 
 - Setar variáveis de ambiente:
   "GITHUB_USERNAME" -> Usuário do Github.
+  
   "GITHUB_REPO" -> Repositório para consulta.
+  
   "GITHUB_API_TOKEN" -> API Token gerado no Github.
+  
   "WEBHOOK_URL" -> Webhook de destino.
+  
   "CHECKING_INTERVAL" - Intervalo em horas que a consulta será realizada.
 
 # Para executar
