@@ -21,6 +21,7 @@ Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-bui
 # Requisitos de execução
 
 - É necessário a criação de um API Token no github: 
+
   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
 
 - Setar variáveis de ambiente:
@@ -36,6 +37,7 @@ Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-bui
 
 # Para executar
   dotnet restore
+  
   dotnet run
 
 
