@@ -119,7 +119,6 @@ module App =
             let resultJson =
                 match (issuesError, commitsError) with
                 | None, None ->
-
                     let result =
                         { User = username
                           Repository = repo

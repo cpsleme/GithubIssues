@@ -4,6 +4,7 @@ open FsHttp
 
 // IO implementation
 module Infra =
+    
     let get uri token =
         http {
             GET uri
