@@ -1,45 +1,44 @@
-# Projeto
+# Project
 
-Esse é um projeto que realiza um consulta em um repositório github trazendo informações sobre issues e contabilizando a quantidade de commits por usuário.
-Essa consulta é realizada de tempos em tempos com um intervalo em horas informado no startup da aplicação.
+This is a project that queries a github repository bringing information about issues and counting the number of commits per user.
+This query is performed from time to time with an interval in hours informed at application startup.
 
-# Stack de desenvolvimento
+# Development stack
 
-O projeto foi desenvolvido na linguagem F# (F Sharp) da plataforma Microsoft .NET, e segue nesse caso o paradigma funcional, já que a linguagem é multi-paradigma.
+The project was developed in the F# language (F Sharp) of the Microsoft .NET platform, and in this case follows the functional paradigm, since the language is multi-paradigm.
 
-# Arquitetura
+# Architecture
 
-O projeto segue uma organização em camadas seguindo um padrão de arquitetura chamado Onion Architecture.
+The project follows an organization in layers following an architectural pattern called Onion Architecture.
 
-Referência: https://marcoatschaefer.medium.com/onion-architecture-explained-building-maintainable-software-54996ff8e464
+Reference: https://marcoatschaefer.medium.com/onion-architecture-explained-building-maintainable-software-54996ff8e464
 
-# Requisitos de instalação
+# installation requirements
 
-- SDK do .NET, versão 6 ou maior
+- .NET SDK, version 6 or higher
   https://dotnet.microsoft.com/en-us/download
 
-# Requisitos de execução
+# Execution requirements
 
-- É necessário a criação de um API Token no github: 
+- It is necessary to create an API Token on github:
 
   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
 
-- Setar variáveis de ambiente:
-  "GITHUB_USERNAME" -> Usuário do Github.
-  
-  "GITHUB_REPO" -> Repositório para consulta.
-  
-  "GITHUB_API_TOKEN" -> API Token gerado no Github.
-  
-  "WEBHOOK_URL" -> Webhook de destino.
-  
-  "CHECKING_INTERVAL" - Intervalo em horas que a consulta será realizada.
+- Set environment variables:
 
-# Para executar
+  "GITHUB_USERNAME" -> Github User.
+  
+  "GITHUB_REPO" -> Repository for consultation.
+  
+  "GITHUB_API_TOKEN" -> API Token generated on Github.
+  
+  "WEBHOOK_URL" -> Target webhook.
+  
+  "CHECKING_INTERVAL" - Interval in hours that the query will be performed.
+
+# To execute
+
   dotnet restore
   
   dotnet run
-
-
-
 
