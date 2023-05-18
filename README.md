@@ -13,7 +13,7 @@ The project follows an organization in layers following an architectural pattern
 
 Reference: https://marcoatschaefer.medium.com/onion-architecture-explained-building-maintainable-software-54996ff8e464
 
-# installation requirements
+# Pre-requirements
 
 - .NET SDK, version 6 or higher
   https://dotnet.microsoft.com/en-us/download
